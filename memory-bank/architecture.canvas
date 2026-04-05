@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {"id": "weather-api", "type": "text", "x": -600, "y": -300, "width": 250, "height": 120, "text": "# 🌤️ 天气数据引擎\n## Open-Meteo API\n- GFS (31成员集合)\n- ECMWF IFS\n- UKMO\n- NWS\n\n输出: 概率分布 P_model"},
+    {"id": "polymarket-api", "type": "text", "x": -600, "y": -100, "width": 250, "height": 120, "text": "# 📊 市场监控引擎\n## Polymarket API\n- Gamma API (市场发现)\n- CLOB API (价格查询)\n- WebSocket (实时流)\n\n输出: 隐含概率 P_market"},
+    {"id": "decision", "type": "text", "x": -150, "y": -200, "width": 250, "height": 140, "text": "# 🧠 决策引擎\n## Edge + Kelly\n1. Edge = P_model - P_market\n2. |Edge| > 5% 过滤\n3. Quarter-Kelly sizing\n4. 综合评分排序\n\n输出: 交易信号列表"},
+    {"id": "risk", "type": "text", "x": 150, "y": -200, "width": 250, "height": 120, "text": "# 🛡️ 风控模块\n## 规则检查\n- 单笔 ≤ 15% bankroll\n- 总敞口 ≤ 50%\n- 日亏 ≤ 10%\n- spread < $0.05\n- 距结算 > 2h"},
+    {"id": "execution", "type": "text", "x": 450, "y": -200, "width": 250, "height": 120, "text": "# ⚡ 交易执行引擎\n## Polymarket CLOB\n- py_clob_client\n- 限价单 (GTC)\n- 仓位管理\n- API 认证\n- Polygon USDC"},
+    {"id": "scheduler", "type": "text", "x": -150, "y": 50, "width": 250, "height": 100, "text": "# ⏰ 调度器\n## APScheduler\n- 每6h: 主交易循环\n- 每1h: 仓位检查\n- 止盈/止损/平仓"},
+    {"id": "memory-bank", "type": "text", "x": 150, "y": 50, "width": 250, "height": 120, "text": "# 📚 Memory Bank\n- strategy-research.md\n- g-updated-rules.md\n- p-history.md\n- progress.md\n- architecture.md"},
+    {"id": "storage", "type": "text", "x": 450, "y": 50, "width": 250, "height": 80, "text": "# 💾 存储\n- SQLite (交易记录)\n- JSON (配置)\n- logs/ (日志)"}
+  ],
+  "edges": [
+    {"id": "e1", "fromNode": "weather-api", "fromSide": "right", "toNode": "decision", "toSide": "left"},
+    {"id": "e2", "fromNode": "polymarket-api", "fromSide": "right", "toNode": "decision", "toSide": "left"},
+    {"id": "e3", "fromNode": "decision", "fromSide": "right", "toNode": "risk", "toSide": "left"},
+    {"id": "e4", "fromNode": "risk", "fromSide": "right", "toNode": "execution", "toSide": "left"},
+    {"id": "e5", "fromNode": "scheduler", "fromSide": "top", "toNode": "decision", "toSide": "bottom"},
+    {"id": "e6", "fromNode": "memory-bank", "fromSide": "left", "toNode": "decision", "toSide": "bottom"},
+    {"id": "e7", "fromNode": "execution", "fromSide": "bottom", "toNode": "storage", "toSide": "top"},
+    {"id": "e8", "fromNode": "scheduler", "fromSide": "right", "toNode": "memory-bank", "toSide": "left"}
+  ]
+}
