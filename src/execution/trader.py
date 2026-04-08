@@ -6,6 +6,7 @@
 """
 
 from datetime import datetime
+import os
 from src.config.settings import TRADING_MODE
 from src.utils.db import get_db
 from src.utils.logger import setup_logger
@@ -79,21 +80,83 @@ def _simulate_trade(signal) -> dict:
     }
 
 
+# CLOB 客户端单例
+_clob_client = None
+
+
+def _get_clob_client():
+    """获取 CLOB 客户端（单例）"""
+    global _clob_client
+    if _clob_client is not None:
+        return _clob_client
+
+    from py_clob_client.client import ClobClient
+    from py_clob_client.clob_types import ApiCreds
+
+    pk = os.getenv("PRIVATE_KEY")
+    funder = os.getenv("FUNDER_ADDRESS")
+    api_key = os.getenv("CLOB_API_KEY")
+    api_secret = os.getenv("CLOB_API_SECRET")
+    api_passphrase = os.getenv("CLOB_API_PASSPHRASE")
+    sig_type = int(os.getenv("CLOB_SIGNATURE_TYPE", "2"))
+
+    if not pk:
+        raise RuntimeError("缺少 PRIVATE_KEY")
+
+    creds = None
+    if all([api_key, api_secret, api_passphrase]):
+        creds = ApiCreds(
+            api_key=api_key,
+            api_secret=api_secret,
+            api_passphrase=api_passphrase,
+        )
+
+    _clob_client = ClobClient(
+        host="https://clob.polymarket.com",
+        chain_id=137,
+        key=pk,
+        signature_type=sig_type,
+        funder=funder,
+        creds=creds,
+    )
+
+    logger.info(f"🔗 CLOB 客户端初始化 (sig_type={sig_type}, funder={funder[:10]}...)")
+    return _clob_client
+
+
 def _live_trade(signal) -> dict:
     """
     实盘交易：通过 CLOB API 下单
-
-    TODO: 需要配置钱包私钥和 API 认证后才能使用
     """
     logger.info(
         f"[实盘] {signal.side} {signal.city} {signal.target_date} "
         f"{signal.label}: {signal.shares:.1f}股 @ ${signal.limit_price:.4f}"
     )
 
-    # TODO: 实现 py_clob_client 下单
-    # from py_clob_client.client import ClobClient
-    # client = ClobClient(...)
-    # order = client.create_and_post_order(...)
+    try:
+        from py_clob_client.clob_types import OrderArgs
+        client = _get_clob_client()
+
+        order_args = OrderArgs(
+            token_id=signal.token_id,
+            price=signal.limit_price,
+            size=signal.shares,
+            side="BUY",
+        )
+        signed = client.create_order(order_args)
+        result = client.post_order(signed)
+
+        if result.get("success"):
+            logger.info(f"✅ 下单成功: OrderID={result.get('orderID', 'N/A')}")
+            status = "open"
+        else:
+            logger.error(f"❌ 下单失败: {result}")
+            status = "failed"
+
+    except Exception as e:
+        logger.error(f"❌ 下单异常: {e}")
+        result = {"error": str(e)}
+        status = "failed"
 
     trade_id = _save_trade(
         city=signal.city,
@@ -108,13 +171,14 @@ def _live_trade(signal) -> dict:
         market_prob=signal.market_prob,
         token_id=signal.token_id,
         market_id=signal.market_id,
-        status="open",
+        status=status,
     )
 
     return {
-        "status": "open",
+        "status": status,
         "trade_id": trade_id,
         "signal": signal,
+        "clob_result": result if 'result' in dir() else None,
     }
 
 
